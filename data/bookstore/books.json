@@ -1,0 +1,4 @@
+[
+  { "id": 10, "title": "A Wizard of Earthsea", "author_id": 1, "price": 12.5 },
+  { "id": 11, "title": "The Tombs of Atuan", "author_id": 1, "price": 13.0 }
+]
