@@ -34,6 +34,11 @@ export type ConnState = {
   buffer: Uint8Array;
   prepared: Map<string, Prepared>;
   portals: Map<string, Portal>;
+  // Password authentication state
+  awaitingPassword?: boolean;
+  expectedUser?: string;
+  expectedPassword?: string;
+  authenticated?: boolean;
 };
 
 export const OID = { bool: 16, int4: 23, text: 25, float8: 701 } as const;

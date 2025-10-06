@@ -45,6 +45,8 @@ Each JSON file must contain an **array of objects**:
 
 ### Running the Server
 
+#### Local Development
+
 ```sh
 # Development mode with hot reload
 bun --hot index.ts
@@ -52,22 +54,57 @@ bun --hot index.ts
 # Or via npm script
 bun run dev
 
-# Custom port (default: 7878)
-PORT=5432 bun index.ts
+# Custom port and database
+PORT=5432 POSTGRES_DB=bookstore bun index.ts
 ```
+
+#### Docker
+
+```sh
+# Build and run with docker-compose
+docker-compose up
+
+# Run in background
+docker-compose up -d
+
+# Stop
+docker-compose down
+```
+
+#### Environment Variables
+
+- `PORT` - Server port (default: 5432)
+- `POSTGRES_PORT` - Alternative port variable (Docker compatibility)
+- `POSTGRES_DB` - Default database name (default: postgres)
+- `HOST` - Bind address (default: 0.0.0.0)
+- `POSTGRES_USER` - Username (default: postgres)
+- `POSTGRES_PASSWORD` - Password (default: postgres)
+- `LOG_LEVEL` - Log level: debug, info, warn, error (default: info)
+
+**Authentication:**
+
+- Defaults to `postgres`/`postgres` (same as PostgreSQL)
+- Override via environment variables or `.env` file
 
 ### Connecting to the Database
 
 **Connection string format**:
 
 ```
-postgresql://anyuser:anypass@localhost:7878/bookstore
+postgresql://anyuser:anypass@localhost:5432/bookstore
 ```
 
 **Example with `psql`**:
 
 ```sh
-psql postgresql://localhost:7878/bookstore
+psql postgresql://localhost:5432/bookstore
+```
+
+**Docker example**:
+
+```sh
+# Connect to the running container
+docker-compose exec db psql postgresql://localhost:5432/bookstore
 ```
 
 **TypeORM configuration** (NestJS):
@@ -76,21 +113,41 @@ psql postgresql://localhost:7878/bookstore
 {
   type: 'postgres',
   host: 'localhost',
-  port: 7878,
+  port: 5432,
   username: 'any',      // auth ignored
   password: 'any',      // auth ignored
   database: 'bookstore'
 }
 ```
 
+**Docker Compose example** (matching PostgreSQL syntax):
+
+```yaml
+services:
+  db:
+    image: your-dockerhub-username/prospect-park
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: north_forest
+      POSTGRES_USER: postgres # Optional: enables auth if both user & password set
+      POSTGRES_PASSWORD: pass1234 # Optional: enables auth if both user & password set
+    volumes:
+      - ./data:/app/data
+```
+
 ### Implementation Notes
 
-- Type inference from JSON values (number → int4/float8, string → text, boolean → bool)
-- No TLS/SSL support
-- No authentication (always accepts)
-- In-memory database cache (`DB_CACHE`)
-- Limited error handling for demo purposes
-- Prepared statements don't support parameters
+- **Type Safety**: Fully type-safe TypeScript with strict mode, no `any` types
+- **Runtime Validation**: JSON data validated with Zod schemas
+- **Type Inference**: Infers PostgreSQL types from JSON values (number → int4/float8, string → text, boolean → bool)
+- **No Caching**: JSON files read fresh on every query (files are single source of truth)
+- **Bun-Native**: Uses `Bun.file()` and `Glob` APIs (no Node.js fs dependencies)
+- **Read-Only**: Explicitly rejects INSERT/UPDATE/DELETE/DROP/CREATE operations
+- **No TLS/SSL**: Server responds with `N` to SSL requests
+- **Required Authentication**: Simple user/password auth via environment variables (required)
+- **Structured Logging**: Pino logger with pretty-print in development
+- **Limited SQL**: Prepared statements don't support parameters
 
 ---
 
@@ -104,14 +161,18 @@ Default to using Bun instead of Node.js.
 - Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>` or `pnpm run <script>`
 - Bun automatically loads .env, so don't use dotenv
 
-### Bun APIs (Not Used in This Project)
+### Bun APIs Used in This Project
 
-This project uses **raw TCP sockets** via `Bun.listen()`, not the HTTP server APIs below:
+- **`Bun.listen()`** - Raw TCP sockets for PostgreSQL wire protocol
+- **`Bun.file()`** - Reading JSON table files
+- **`Glob`** - Finding JSON files in database directories (from `bun` package)
 
-- `Bun.serve()` - For HTTP/WebSocket servers (not used here)
+### Bun APIs Not Used
+
+- `Bun.serve()` - For HTTP/WebSocket servers (this is a TCP server)
 - `bun:sqlite` - For SQLite (not applicable)
 - `Bun.redis`, `Bun.sql` - For Redis/Postgres clients (not applicable)
-- Prefer `Bun.file` over `node:fs` (this project uses `node:fs/promises` for directory scanning)
+- `node:fs` - Not used; replaced with Bun's native file APIs
 
 ### Testing
 

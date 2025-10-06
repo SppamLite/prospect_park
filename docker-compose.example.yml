@@ -1,0 +1,44 @@
+# Example: Multiple database configurations
+#
+# To use this example:
+#   cp docker-compose.example.yml docker-compose.yml
+#   docker-compose up
+
+services:
+  # Bookstore database on port 5432
+  bookstore:
+    build: .
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: bookstore
+      PORT: 5432
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  # Another database on a different port
+  myapp:
+    build: .
+    ports:
+      - "5433:5433"
+    environment:
+      POSTGRES_DB: myapp
+      PORT: 5433
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  # Match the example from README - north_forest database
+  north_forest:
+    build: .
+    ports:
+      - "5434:5434"
+    environment:
+      POSTGRES_DB: north_forest
+      POSTGRES_USER: postgres # Ignored (no auth), for compatibility
+      POSTGRES_PASSWORD: pass1234 # Ignored (no auth), for compatibility
+      PORT: 5434
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

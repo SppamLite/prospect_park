@@ -1,54 +1,56 @@
-import type { DB, Table } from "../types/index.ts";
+import type { DB } from "../types/index.ts";
 import { z } from "zod";
-
-const DB_CACHE = new Map<string, DB>();
+import { Glob } from "bun";
+import { logger } from "../utils/logger.ts";
 
 // Schema for validating JSON table data
 const TableRowSchema = z.record(z.string(), z.unknown());
 const TableSchema = z.array(TableRowSchema);
 
 export async function loadDB(dbName: string): Promise<DB> {
-  if (DB_CACHE.has(dbName)) return DB_CACHE.get(dbName)!;
-
-  const fs = await import("node:fs/promises");
   const base = `./data/${dbName}`;
-  let files: string[] = [];
+  const db: DB = {};
 
   try {
-    for await (const entry of await fs.opendir(base)) {
-      if (entry.isFile() && entry.name.endsWith(".json")) {
-        files.push(entry.name);
+    // Use Bun's Glob API to find all JSON files
+    const glob = new Glob("*.json");
+    const files = Array.from(glob.scanSync(base));
+
+    if (files.length === 0) {
+      // Database directory exists but is empty
+      return {};
+    }
+
+    for (const f of files) {
+      const table = f.replace(/\.json$/i, "");
+      try {
+        // Use Bun.file() API for reading files
+        const file = Bun.file(`${base}/${f}`);
+        const txt = await file.text();
+        const parsed: unknown = JSON.parse(txt);
+
+        // Validate with Zod schema
+        const validated = TableSchema.safeParse(parsed);
+        if (validated.success) {
+          db[table] = validated.data;
+          logger.debug(
+            { database: dbName, table, rows: validated.data.length },
+            "Loaded table",
+          );
+        } else {
+          logger.warn(
+            { file: f, error: validated.error.message },
+            "Invalid table data",
+          );
+        }
+      } catch (err) {
+        logger.warn({ file: f, err }, "Failed to load table");
       }
     }
   } catch {
     // Database directory doesn't exist
-    DB_CACHE.set(dbName, {});
     return {};
   }
 
-  const db: DB = {};
-  for (const f of files) {
-    const table = f.replace(/\.json$/i, "");
-    try {
-      const txt = await fs.readFile(`${base}/${f}`, "utf8");
-      const parsed: unknown = JSON.parse(txt);
-
-      // Validate with Zod schema
-      const validated = TableSchema.safeParse(parsed);
-      if (validated.success) {
-        db[table] = validated.data;
-      } else {
-        console.warn(`Invalid table data in ${f}: ${validated.error.message}`);
-      }
-    } catch (err) {
-      console.warn(`Failed to load table ${f}:`, err);
-    }
-  }
-
-  DB_CACHE.set(dbName, db);
   return db;
-}
-
-export function clearDBCache(): void {
-  DB_CACHE.clear();
 }

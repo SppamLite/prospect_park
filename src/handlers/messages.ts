@@ -1,12 +1,11 @@
 import type { ConnState, PgSocket } from "../types/index.ts";
 import { OID } from "../types/index.ts";
-import { concat, readCString, td } from "../utils/bytes.ts";
+import { concat, readCString } from "../utils/bytes.ts";
 import {
   BindComplete,
   CloseComplete,
   CommandComplete,
   DataRow,
-  EmptyQueryResponse,
   ErrorResponse,
   NoData,
   ParseComplete,
@@ -16,6 +15,7 @@ import {
 import { parseSelect } from "../sql/parser.ts";
 import { execSelect } from "../sql/executor.ts";
 import { loadDB } from "../storage/json-store.ts";
+import { logger } from "../utils/logger.ts";
 
 export async function handleSimpleQuery(
   sock: PgSocket,
@@ -33,6 +33,26 @@ export async function handleSimpleQuery(
         DataRow(["1"]),
         CommandComplete("SELECT 1"),
         ReadyForQuery("I"),
+      ]),
+    );
+    return;
+  }
+
+  // Reject write operations - this is a read-only database
+  const writeKeywords =
+    /^\s*(INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|TRUNCATE|GRANT|REVOKE)\b/i;
+  if (writeKeywords.test(sql)) {
+    logger.warn(
+      { database: state.dbName, sql: sql.substring(0, 100) },
+      "Rejected write operation attempt",
+    );
+    sock.write(
+      concat([
+        ErrorResponse(
+          "Write operations not supported - this is a read-only database",
+          "42601",
+        ),
+        ReadyForQuery("E"),
       ]),
     );
     return;

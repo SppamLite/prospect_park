@@ -46,8 +46,9 @@ prospect_park/
 ### `src/types/index.ts`
 
 - All TypeScript type definitions
-- Shared types: `Bytes`, `ColumnSpec`, `DB`, `Table`, `SelectQuery`, `ConnState`, etc.
+- Shared types: `Bytes`, `PgSocket`, `ColumnSpec`, `DB`, `Table`, `SelectQuery`, `ConnState`, etc.
 - PostgreSQL OID constants
+- **Type-safe**: No `any` types used anywhere in the codebase
 
 ### `src/protocol/messages.ts`
 
@@ -95,8 +96,10 @@ prospect_park/
 
 ### `src/storage/json-store.ts`
 
-- Loads JSON files from `./data/<database>/` directory
-- Caches databases in memory
+- Loads JSON files from `./data/<database>/` directory using Bun's native APIs
+- **No caching**: Reads files fresh on every query (JSON files are single source of truth)
+- Uses `Bun.file()` for reading and `Glob` for file discovery
+- Validates JSON data with Zod schemas at runtime
 - Each `.json` file = one table
 - Tables must be arrays of objects
 
@@ -112,10 +115,12 @@ prospect_park/
 
 1. **Single Responsibility**: Each module has one clear purpose
 2. **Pure Functions**: Most functions are stateless transformations
-3. **Type Safety**: Strong typing throughout with TypeScript
-4. **Separation of Concerns**: Protocol, SQL, storage, and handlers are independent
-5. **Testability**: Small, focused modules are easy to unit test
-6. **Readability**: Clear naming and organization
+3. **Type Safety**: Strict TypeScript with no `any` types, runtime validation with Zod
+4. **Bun-Native**: Uses Bun's native APIs (`Bun.file()`, `Glob`) instead of Node.js dependencies
+5. **No Caching**: JSON files are always read fresh as single source of truth
+6. **Separation of Concerns**: Protocol, SQL, storage, and handlers are independent
+7. **Testability**: Small, focused modules are easy to unit test
+8. **Readability**: Clear naming and organization
 
 ## Key Improvements from Original
 
@@ -124,6 +129,10 @@ prospect_park/
 - **Maintainable**: Clear boundaries between layers
 - **Extensible**: Easy to add new SQL features, message types, or storage backends
 - **Better organization**: Related code grouped together
+- **Type-safe**: Fully type-safe with strict TypeScript, no `any` types
+- **Runtime validation**: JSON data validated with Zod schemas
+- **Bun-optimized**: Uses Bun's native file APIs instead of Node.js fs
+- **No caching**: Always reads fresh data from JSON files
 
 ## Adding New Features
 

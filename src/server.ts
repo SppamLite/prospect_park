@@ -13,6 +13,7 @@ import {
   handleSimpleQuery,
   handleTerminate,
 } from "./handlers/messages.ts";
+import { handlePasswordMessage } from "./handlers/password.ts";
 import { processFrontendMessages } from "./protocol/framing.ts";
 import { concat, td } from "./utils/bytes.ts";
 import {
@@ -20,11 +21,19 @@ import {
   ErrorResponse,
   ReadyForQuery,
 } from "./protocol/messages.ts";
+import { logger } from "./utils/logger.ts";
 
-const PORT = Number(process.env.PORT ?? 7878);
+// Configuration from environment variables (Docker-compatible)
+const PORT = Number(process.env.PORT ?? process.env.POSTGRES_PORT ?? 5432);
+const HOST = process.env.HOST ?? "0.0.0.0";
+const DEFAULT_DB = process.env.POSTGRES_DB ?? "postgres";
 
-Bun.listen({
-  hostname: "localhost",
+// Authentication (defaults to postgres/postgres like PostgreSQL)
+const AUTH_USER = process.env.POSTGRES_USER ?? "postgres";
+const AUTH_PASSWORD = process.env.POSTGRES_PASSWORD ?? "postgres";
+
+Bun.listen<unknown>({
+  hostname: HOST,
   port: PORT,
   socket: {
     open(_sock) {
@@ -37,7 +46,11 @@ Bun.listen({
 
       if (!state) {
         // Expect StartupMessage/SSLRequest/CancelRequest first
-        handleStartup(pgSock, incoming).catch((err) => {
+        handleStartup(pgSock, incoming, {
+          defaultDb: DEFAULT_DB,
+          authUser: AUTH_USER,
+          authPassword: AUTH_PASSWORD,
+        }).catch((err) => {
           handleStartupError(pgSock, err);
         });
         return;
@@ -47,6 +60,23 @@ Bun.listen({
       state.buffer = new Uint8Array([...state.buffer, ...incoming]);
 
       processFrontendMessages(pgSock, state, (type, payload) => {
+        // Handle password message during authentication
+        if (type === "p" && state.awaitingPassword) {
+          handlePasswordMessage(pgSock, state, payload);
+          return;
+        }
+
+        // Reject queries if not yet authenticated
+        if (!state.authenticated) {
+          pgSock.write(
+            concat([
+              ErrorResponse("Authentication required", "28P01"),
+              ReadyForQuery("E"),
+            ]),
+          );
+          return;
+        }
+
         switch (type) {
           case "X": // Terminate
             handleTerminate(pgSock);
@@ -108,11 +138,17 @@ Bun.listen({
     },
 
     error(_sock, err) {
-      console.error("socket error:", err);
+      logger.error({ err }, "Socket error");
     },
   },
 });
 
-console.log(
-  `Prospect Park listening on 0.0.0.0:${PORT}  (data dir: ./data/<db>/*.json)`,
+logger.info(
+  {
+    host: HOST,
+    port: PORT,
+    defaultDb: DEFAULT_DB,
+    authEnabled: true,
+  },
+  "Prospect Park server started",
 );

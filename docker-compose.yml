@@ -1,0 +1,16 @@
+services:
+  db:
+    build: .
+    ports:
+      - "5432:5432"
+    environment:
+      # PostgreSQL-compatible environment variables
+      POSTGRES_DB: bookstore # Database name
+      POSTGRES_USER: postgres # Required - server fails if not set
+      POSTGRES_PASSWORD: postgres # Required - server fails if not set
+      PORT: 5432 # Server port
+      LOG_LEVEL: info # Log level (debug, info, warn, error)
+    volumes:
+      # Mount local data directory for persistence
+      - ./data:/app/data
+    restart: unless-stopped
