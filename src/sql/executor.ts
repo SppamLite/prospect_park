@@ -1,4 +1,11 @@
-import type { Bytes, ColumnSpec, DB, SelectQuery } from "../types/index.ts";
+import type {
+  Bytes,
+  ColumnSpec,
+  DB,
+  Query,
+  SelectQuery,
+  InformationSchemaQuery,
+} from "../types/index.ts";
 import { OID } from "../types/index.ts";
 import { DataRow } from "../protocol/messages.ts";
 
@@ -26,6 +33,49 @@ function toTextCell(v: unknown): string | null {
   return String(v);
 }
 
+export function execShowTables(db: DB): {
+  cols: ColumnSpec[];
+  data: Bytes[];
+  tag: string;
+} {
+  const tableNames = Object.keys(db).sort();
+
+  const cols: ColumnSpec[] = [
+    { name: "Tables", typeOID: OID.text, typeSize: -1, format: 0 },
+  ];
+
+  const data = tableNames.map((name) => DataRow([name]));
+
+  return { cols, data, tag: `SELECT ${tableNames.length}` };
+}
+
+export function execInformationSchemaTables(
+  q: InformationSchemaQuery,
+  db: DB,
+  dbName: string,
+): { cols: ColumnSpec[]; data: Bytes[]; tag: string } {
+  const tableNames = Object.keys(db).sort();
+  const schemaName = "public"; // Default schema name for now
+
+  // Filter by schema if specified
+  const filteredTables =
+    q.schemaFilter && q.schemaFilter !== schemaName ? [] : tableNames;
+
+  // Standard information_schema.tables columns
+  const cols: ColumnSpec[] = [
+    { name: "table_catalog", typeOID: OID.text, typeSize: -1, format: 0 },
+    { name: "table_schema", typeOID: OID.text, typeSize: -1, format: 0 },
+    { name: "table_name", typeOID: OID.text, typeSize: -1, format: 0 },
+    { name: "table_type", typeOID: OID.text, typeSize: -1, format: 0 },
+  ];
+
+  const data = filteredTables.map((tableName) =>
+    DataRow([dbName, schemaName, tableName, "BASE TABLE"]),
+  );
+
+  return { cols, data, tag: `SELECT ${filteredTables.length}` };
+}
+
 export function execSelect(
   q: SelectQuery,
   db: DB,
@@ -37,7 +87,17 @@ export function execSelect(
   if (q.where) {
     rows = rows.filter((r) => r[q.where!.col] === q.where!.value);
   }
-  if (q.limit !== undefined) rows = rows.slice(0, q.limit);
+
+  // Apply OFFSET and LIMIT
+  const offset = q.offset ?? 0;
+  const limit = q.limit;
+
+  if (offset > 0) {
+    rows = rows.slice(offset);
+  }
+  if (limit !== undefined) {
+    rows = rows.slice(0, limit);
+  }
 
   // Handle COUNT(*) queries
   if (q.isCountStar) {
@@ -70,4 +130,21 @@ export function execSelect(
   );
 
   return { cols: colsSpec, data, tag: `SELECT ${rows.length}` };
+}
+
+export function execQuery(
+  query: Query,
+  db: DB,
+  dbName: string,
+): { cols: ColumnSpec[]; data: Bytes[]; tag: string } {
+  if ("type" in query) {
+    if (query.type === "show_tables") {
+      return execShowTables(db);
+    }
+    if (query.type === "information_schema_tables") {
+      return execInformationSchemaTables(query, db, dbName);
+    }
+  }
+  // Type narrowing: if it's not a ShowTablesQuery or InformationSchemaQuery, it must be a SelectQuery
+  return execSelect(query as SelectQuery, db);
 }

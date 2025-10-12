@@ -23,8 +23,20 @@ export type SelectQuery = {
   table: string;
   where?: { col: string; op: "="; value: string | number | boolean | null };
   limit?: number;
+  offset?: number;
   isCountStar?: boolean;
 };
+
+export type ShowTablesQuery = {
+  type: "show_tables";
+};
+
+export type InformationSchemaQuery = {
+  type: "information_schema_tables";
+  schemaFilter?: string;
+};
+
+export type Query = SelectQuery | ShowTablesQuery | InformationSchemaQuery;
 
 export type Prepared = { name: string; sql: string };
 export type Portal = { name: string; stmtName: string };

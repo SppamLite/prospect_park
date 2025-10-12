@@ -12,8 +12,8 @@ import {
   ReadyForQuery,
   RowDescription,
 } from "../protocol/messages.ts";
-import { parseSelect } from "../sql/parser.ts";
-import { execSelect } from "../sql/executor.ts";
+import { parseQuery } from "../sql/parser.ts";
+import { execQuery } from "../sql/executor.ts";
 import { loadDB } from "../storage/json-store.ts";
 import { logger } from "../utils/logger.ts";
 
@@ -59,7 +59,7 @@ export async function handleSimpleQuery(
   }
 
   const db = await loadDB(state.dbName);
-  const parsed = parseSelect(sql);
+  const parsed = parseQuery(sql);
 
   if (!parsed) {
     sock.write(
@@ -72,7 +72,7 @@ export async function handleSimpleQuery(
   }
 
   try {
-    const res = execSelect(parsed, db);
+    const res = execQuery(parsed, db, state.dbName);
     sock.write(
       concat([
         RowDescription(res.cols),
@@ -193,7 +193,7 @@ export async function handleDescribe(
     return;
   }
 
-  const parsed = parseSelect(sql);
+  const parsed = parseQuery(sql);
   if (!parsed) {
     sock.write(NoData());
     return;
@@ -202,7 +202,14 @@ export async function handleDescribe(
   // Build a RowDescription from current DB (best-effort)
   try {
     const db = await loadDB(state.dbName);
-    const res = execSelect({ ...parsed, limit: 0 }, db);
+    // For SHOW TABLES or information_schema, use the query as-is; for SELECT, set limit to 0
+    const queryToDescribe =
+      "type" in parsed &&
+      (parsed.type === "show_tables" ||
+        parsed.type === "information_schema_tables")
+        ? parsed
+        : { ...parsed, limit: 0 };
+    const res = execQuery(queryToDescribe, db, state.dbName);
     sock.write(RowDescription(res.cols));
   } catch {
     sock.write(NoData());
