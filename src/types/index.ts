@@ -42,8 +42,25 @@ export type InformationSchemaSchemataQuery = {
   type: "information_schema_schemata";
 };
 
+export type PgNamespaceQuery = {
+  type: "pg_namespace";
+};
+
 export type PgDatabaseQuery = {
   type: "pg_database";
+};
+
+export type VersionQuery = {
+  type: "version";
+};
+
+export type PgTypeQuery = {
+  type: "pg_type";
+};
+
+export type PgClassQuery = {
+  type: "pg_class";
+  isMaterializedViews: boolean;
 };
 
 export type Query =
@@ -51,7 +68,11 @@ export type Query =
   | ShowTablesQuery
   | InformationSchemaTablesQuery
   | InformationSchemaSchemataQuery
-  | PgDatabaseQuery;
+  | PgNamespaceQuery
+  | PgDatabaseQuery
+  | VersionQuery
+  | PgTypeQuery
+  | PgClassQuery;
 
 export type Prepared = { name: string; sql: string };
 export type Portal = { name: string; stmtName: string };

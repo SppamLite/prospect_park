@@ -77,6 +77,10 @@ export async function handleSimpleQuery(
 
   try {
     const res = await execQuery(parsed, db, state.dbName);
+    logger.info(
+      { database: state.dbName, rowCount: res.data.length, tag: res.tag },
+      "Query executed successfully",
+    );
     sock.write(
       concat([
         RowDescription(res.cols),

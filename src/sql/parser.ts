@@ -4,7 +4,11 @@ import type {
   ShowTablesQuery,
   InformationSchemaTablesQuery,
   InformationSchemaSchemataQuery,
+  PgNamespaceQuery,
   PgDatabaseQuery,
+  VersionQuery,
+  PgTypeQuery,
+  PgClassQuery,
 } from "../types/index.ts";
 
 function parseLiteral(lit: string): string | number | boolean | null {
@@ -19,6 +23,37 @@ function parseLiteral(lit: string): string | number | boolean | null {
 
 export function parseQuery(sqlRaw: string): Query | null {
   const sql = sqlRaw.trim().replace(/;$/, "");
+
+  // Check for SELECT version()
+  if (/^select\s+version\(\s*\)\s*$/i.test(sql)) {
+    const query: VersionQuery = { type: "version" };
+    return query;
+  }
+
+  // Check for pg_type queries (return empty result set)
+  if (/^select\s+.*\s+from\s+pg_type/i.test(sql)) {
+    const query: PgTypeQuery = { type: "pg_type" };
+    return query;
+  }
+
+  // Check for pg_class queries (for table listing with JOINs)
+  // Check if it's looking for materialized views (relkind = 'm')
+  if (/WHERE c\.relkind\s*=\s*'m'/i.test(sql)) {
+    // Materialized views query - we don't support these, return empty
+    const query: PgClassQuery = { type: "pg_class", isMaterializedViews: true };
+    return query;
+  }
+
+  if (
+    /^select\s+.*\s+from\s+pg_catalog\.pg_class/i.test(sql) ||
+    /^select\s+.*\s+from\s+pg_class/i.test(sql)
+  ) {
+    const query: PgClassQuery = {
+      type: "pg_class",
+      isMaterializedViews: false,
+    };
+    return query;
+  }
 
   // Check for SHOW TABLES
   if (/^show\s+tables\s*$/i.test(sql)) {
@@ -47,8 +82,8 @@ export function parseQuery(sqlRaw: string): Query | null {
 
   // Check for pg_catalog.pg_namespace queries (alternative for schema list)
   if (/^select\s+.*\s+from\s+pg_catalog\.pg_namespace/i.test(sql)) {
-    const query: InformationSchemaSchemataQuery = {
-      type: "information_schema_schemata",
+    const query: PgNamespaceQuery = {
+      type: "pg_namespace",
     };
     return query;
   }

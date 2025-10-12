@@ -96,6 +96,24 @@ export function execShowTables(db: DB): {
   return { cols, data, tag: `SELECT ${tableNames.length}` };
 }
 
+export function execPgNamespace(db: DB): {
+  cols: ColumnSpec[];
+  data: Bytes[];
+  tag: string;
+} {
+  // Get all schema names for pg_catalog.pg_namespace
+  const schemaNames = Object.keys(db).sort();
+
+  // pg_namespace columns (just nspname for the simple query)
+  const cols: ColumnSpec[] = [
+    { name: "nspname", typeOID: OID.text, typeSize: -1, format: 0 },
+  ];
+
+  const data = schemaNames.map((schemaName) => DataRow([schemaName]));
+
+  return { cols, data, tag: `SELECT ${schemaNames.length}` };
+}
+
 export function execInformationSchemaSchemata(
   db: DB,
   dbName: string,
@@ -218,12 +236,95 @@ export function execSelect(
   return { cols: colsSpec, data, tag: `SELECT ${rows.length}` };
 }
 
+export function execVersion(): {
+  cols: ColumnSpec[];
+  data: Bytes[];
+  tag: string;
+} {
+  const cols: ColumnSpec[] = [
+    { name: "version", typeOID: OID.text, typeSize: -1, format: 0 },
+  ];
+  const data = [
+    DataRow([
+      "PostgreSQL 16.0 (Prospect Park JSON Database) on x86_64-pc-linux-gnu, compiled by Bun, 64-bit",
+    ]),
+  ];
+  return { cols, data, tag: "SELECT 1" };
+}
+
+export function execPgType(): {
+  cols: ColumnSpec[];
+  data: Bytes[];
+  tag: string;
+} {
+  // Return empty result set with proper columns
+  const cols: ColumnSpec[] = [
+    { name: "oid", typeOID: OID.int4, typeSize: 4, format: 0 },
+    { name: "typname", typeOID: OID.text, typeSize: -1, format: 0 },
+  ];
+  return { cols, data: [], tag: "SELECT 0" };
+}
+
+export function execPgClass(
+  db: DB,
+  isMaterializedViews: boolean,
+): {
+  cols: ColumnSpec[];
+  data: Bytes[];
+  tag: string;
+} {
+  const cols: ColumnSpec[] = [
+    { name: "oid", typeOID: OID.int4, typeSize: 4, format: 0 },
+    { name: "table_name", typeOID: OID.text, typeSize: -1, format: 0 },
+    { name: "table_schema", typeOID: OID.text, typeSize: -1, format: 0 },
+  ];
+
+  // If looking for materialized views, return empty (we don't support them)
+  if (isMaterializedViews) {
+    return { cols, data: [], tag: "SELECT 0" };
+  }
+
+  // Return tables from pg_class with JOIN-like structure
+  const allTables: Array<{ schema: string; table: string; oid: number }> = [];
+  let oidCounter = 16384; // Start from typical user table OID
+
+  for (const [schemaName, schema] of Object.entries(db)) {
+    for (const tableName of Object.keys(schema)) {
+      allTables.push({
+        schema: schemaName,
+        table: tableName,
+        oid: oidCounter++,
+      });
+    }
+  }
+
+  allTables.sort((a, b) => {
+    if (a.schema !== b.schema) return a.schema.localeCompare(b.schema);
+    return a.table.localeCompare(b.table);
+  });
+
+  const data = allTables.map(({ oid, table, schema }) =>
+    DataRow([String(oid), table, schema]),
+  );
+
+  return { cols, data, tag: `SELECT ${allTables.length}` };
+}
+
 export async function execQuery(
   query: Query,
   db: DB,
   dbName: string,
 ): Promise<{ cols: ColumnSpec[]; data: Bytes[]; tag: string }> {
   if ("type" in query) {
+    if (query.type === "version") {
+      return execVersion();
+    }
+    if (query.type === "pg_type") {
+      return execPgType();
+    }
+    if (query.type === "pg_class") {
+      return execPgClass(db, query.isMaterializedViews);
+    }
     if (query.type === "show_tables") {
       return execShowTables(db);
     }
@@ -232,6 +333,9 @@ export async function execQuery(
     }
     if (query.type === "information_schema_schemata") {
       return execInformationSchemaSchemata(db, dbName);
+    }
+    if (query.type === "pg_namespace") {
+      return execPgNamespace(db);
     }
     if (query.type === "pg_database") {
       return await execPgDatabase();

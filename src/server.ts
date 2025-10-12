@@ -60,6 +60,31 @@ Bun.listen<unknown>({
       state.buffer = new Uint8Array([...state.buffer, ...incoming]);
 
       processFrontendMessages(pgSock, state, (type, payload) => {
+        // Log incoming message
+        if (type === "Q") {
+          const sql = td.decode(payload.subarray(0, payload.length - 1));
+          logger.info(
+            { type, sql: sql.substring(0, 200), database: state.dbName },
+            "Incoming message",
+          );
+        } else if (type === "P") {
+          // Parse message - extract query
+          const queryEnd = payload.indexOf(0, payload.indexOf(0) + 1);
+          if (queryEnd > 0) {
+            const query = td.decode(
+              payload.slice(payload.indexOf(0) + 1, queryEnd),
+            );
+            logger.info(
+              { type, query: query.substring(0, 200), database: state.dbName },
+              "Incoming message",
+            );
+          } else {
+            logger.info({ type, database: state.dbName }, "Incoming message");
+          }
+        } else {
+          logger.info({ type, database: state.dbName }, "Incoming message");
+        }
+
         // Handle password message during authentication
         if (type === "p" && state.awaitingPassword) {
           handlePasswordMessage(pgSock, state, payload);
