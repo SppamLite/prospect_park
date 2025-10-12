@@ -5,6 +5,8 @@ A lightweight PostgreSQL wire-protocol compatible database server that reads JSO
 ## Features
 
 - **PostgreSQL Compatible**: Works with any PostgreSQL client (psql, TablePlus, pgAdmin, TypeORM, etc.)
+- **Multi-Schema Support**: Organize tables into schemas (public, sales, inventory, etc.)
+- **Multi-Database Support**: Switch between databases seamlessly from your client
 - **Read-Only**: Perfect for demo/testing - rejects all write operations (INSERT/UPDATE/DELETE)
 - **JSON-based Storage**: Each `.json` file = one table (simple and portable)
 - **Type-Safe**: Built with TypeScript and runtime validation via Zod
@@ -12,6 +14,7 @@ A lightweight PostgreSQL wire-protocol compatible database server that reads JSO
 - **Docker Ready**: Drop-in replacement for PostgreSQL in docker-compose
 - **Required Authentication**: Simple user/password auth via environment variables
 - **Structured Logging**: Pino logger with pretty output in development
+- **GUI Client Ready**: Full support for TablePlus, pgAdmin, DBeaver with schema/table discovery
 
 ## Quick Start with Docker
 
@@ -61,13 +64,24 @@ docker-compose up
 
 ## Data Format
 
-Create JSON files in `./data/<database>/` directory:
+Create JSON files organized by database and schema:
 
 ```
 data/
-└── bookstore/
-    ├── books.json
-    └── authors.json
+├── bookstore/              # Database name
+│   ├── public/            # Schema: public (default)
+│   │   ├── books.json
+│   │   └── authors.json
+│   └── sales/             # Schema: sales
+│       └── records.json
+└── ecommerce/             # Another database
+    ├── public/
+    │   └── customers.json
+    ├── inventory/
+    │   ├── products.json
+    │   └── suppliers.json
+    └── orders/
+        └── order_items.json
 ```
 
 Each JSON file must contain an **array of objects**:
@@ -78,6 +92,12 @@ Each JSON file must contain an **array of objects**:
   { "id": 2, "title": "1984", "price": 14.99 }
 ]
 ```
+
+**Schema Support:**
+- Each subdirectory under `data/<database>/` is a schema
+- Use `public` schema for default tables
+- Query with schema: `SELECT * FROM sales.records`
+- Query without schema: `SELECT * FROM books` (defaults to `public`)
 
 ## Connecting
 
@@ -111,15 +131,25 @@ postgresql://anyuser:anypass@localhost:5432/bookstore
 
 **Read-only operations:**
 
-- `SELECT * FROM table [WHERE col = literal] [LIMIT n]`
-- `SELECT col1, col2 FROM table [WHERE col = literal] [LIMIT n]`
-- `SELECT count(*) FROM table [WHERE col = literal]`
+- `SELECT * FROM [schema.]table [WHERE col = literal] [LIMIT n] [OFFSET n]`
+- `SELECT col1, col2 FROM [schema.]table [WHERE col = literal] [LIMIT n]`
+- `SELECT count(*) FROM [schema.]table [WHERE col = literal]`
 - `SELECT 1` (connection testing)
+- `SELECT version()` (server version)
+- `SHOW TABLES` (list all tables)
+- Schema-qualified queries: `SELECT * FROM sales.records`
+- Metadata queries: `information_schema.tables`, `pg_catalog.pg_namespace`, `pg_catalog.pg_database`
 
 **❌ Write operations are rejected:**
 
 - INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE, etc.
 - Server returns error: "Write operations not supported - this is a read-only database"
+
+**❌ Not supported:**
+
+- JOINs, subqueries, GROUP BY, ORDER BY (except in metadata queries)
+- Prepared statement parameters
+- Transactions, locks, triggers, functions
 
 ## Use Cases
 
@@ -132,12 +162,14 @@ postgresql://anyuser:anypass@localhost:5432/bookstore
 ## Limitations
 
 - **Read-only**: No write operations (INSERT/UPDATE/DELETE rejected)
-- **Simple authentication**: Username/password via env vars (required)
+- **Simple authentication**: Username/password via env vars (cleartext)
 - **No TLS/SSL** support
-- **Very limited SQL**: SELECT only, no JOINs, subqueries, or complex operations
+- **Limited SQL**: SELECT only, no JOINs, subqueries, or complex operations
 - **No prepared statement parameters**
+- **No transactions or locks**
 - **Single-threaded**: Not for production use
 - **No persistence beyond JSON files**: Edit JSON files directly to update data
+- **Schema-based organization**: Tables must be organized in schema subdirectories
 
 ## Local Development
 

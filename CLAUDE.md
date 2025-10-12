@@ -15,23 +15,45 @@ A PostgreSQL wire-protocol compatible database server that reads JSON files as d
   - Simple Query Protocol (`Q` message)
   - Extended Query Protocol: Parse, Bind, Describe, Execute, Sync, Flush, Close
   - SSL Request (responds with `N` - not supported)
-  - No authentication (responds with `AuthenticationOk`)
-- **SQL Support**: Very limited subset
-  - `SELECT * FROM table [WHERE col = literal] [LIMIT n]`
-  - `SELECT col1, col2 FROM table [WHERE col = literal] [LIMIT n]`
-  - `SELECT count(*) FROM table [WHERE col = literal] [LIMIT n]`
+  - Password authentication (cleartext)
+- **SQL Support**: Limited subset for read operations
+  - `SELECT * FROM [schema.]table [WHERE col = literal] [LIMIT n] [OFFSET n]`
+  - `SELECT col1, col2 FROM [schema.]table [WHERE col = literal] [LIMIT n]`
+  - `SELECT count(*) FROM [schema.]table [WHERE col = literal]`
   - `SELECT 1` (built-in for connection testing)
+  - `SELECT version()` (returns server version)
+  - `SHOW TABLES` (lists all tables)
+  - `SELECT ... FROM information_schema.tables` (table metadata)
+  - `SELECT ... FROM information_schema.schemata` (schema metadata)
+  - `SELECT ... FROM pg_catalog.pg_namespace` (schema list)
+  - `SELECT ... FROM pg_catalog.pg_database` (database list)
+  - `SELECT ... FROM pg_catalog.pg_class` (table/view list)
+  - `SELECT ... FROM pg_type` (type information - returns empty)
+  - Schema-qualified queries: `schema.table` or `"schema"."table"`
   - No parameters in prepared statements
+  - No JOINs, GROUP BY, or complex queries
 
 ### Data Storage Format
 
+The server supports **multi-schema databases** with the following structure:
+
 ```
 data/
-├── bookstore/          # Database name
-│   ├── books.json     # Table: books
-│   └── authors.json   # Table: authors
-└── myapp/             # Another database
-    └── users.json     # Table: users
+├── bookstore/              # Database name
+│   ├── public/            # Schema: public (default)
+│   │   ├── books.json     # Table: books
+│   │   └── authors.json   # Table: authors
+│   └── sales/             # Schema: sales
+│       └── records.json   # Table: records
+└── ecommerce/             # Another database
+    ├── public/
+    │   └── customers.json
+    ├── inventory/
+    │   ├── products.json
+    │   └── suppliers.json
+    └── orders/
+        ├── orders.json
+        └── order_items.json
 ```
 
 Each JSON file must contain an **array of objects**:
@@ -42,6 +64,12 @@ Each JSON file must contain an **array of objects**:
   { "id": 2, "title": "Another", "price": 15.0 }
 ]
 ```
+
+**Schema Support:**
+- Each subdirectory under `data/<database>/` is treated as a schema
+- The `public` schema is used by default if no schema is specified in queries
+- Query with schema: `SELECT * FROM sales.records` or `SELECT * FROM "sales"."records"`
+- Query without schema: `SELECT * FROM books` (uses `public` schema)
 
 ### Running the Server
 
@@ -114,9 +142,10 @@ docker-compose exec db psql postgresql://localhost:5432/bookstore
   type: 'postgres',
   host: 'localhost',
   port: 5432,
-  username: 'any',      // auth ignored
-  password: 'any',      // auth ignored
-  database: 'bookstore'
+  username: 'postgres',
+  password: 'postgres',
+  database: 'bookstore',
+  schema: 'public'  // Optional: default schema
 }
 ```
 
@@ -148,6 +177,11 @@ services:
 - **Required Authentication**: Simple user/password auth via environment variables (required)
 - **Structured Logging**: Pino logger with pretty-print in development
 - **Limited SQL**: Prepared statements don't support parameters
+- **GUI Client Support**: Compatible with TablePlus, pgAdmin, and other PostgreSQL GUI clients
+  - Database switching works seamlessly
+  - Schema dropdown displays all schemas
+  - Table list shows tables grouped by schema
+  - Supports metadata queries for client introspection
 
 ---
 
