@@ -16,10 +16,12 @@ export type ColumnSpec = {
 };
 
 export type Table = Array<Record<string, unknown>>;
-export type DB = Record<string, Table>; // table name -> rows
+export type Schema = Record<string, Table>; // table name -> rows
+export type DB = Record<string, Schema>; // schema name -> tables
 
 export type SelectQuery = {
   columns: "*" | string[];
+  schema?: string; // defaults to "public"
   table: string;
   where?: { col: string; op: "="; value: string | number | boolean | null };
   limit?: number;
@@ -31,12 +33,25 @@ export type ShowTablesQuery = {
   type: "show_tables";
 };
 
-export type InformationSchemaQuery = {
+export type InformationSchemaTablesQuery = {
   type: "information_schema_tables";
   schemaFilter?: string;
 };
 
-export type Query = SelectQuery | ShowTablesQuery | InformationSchemaQuery;
+export type InformationSchemaSchemataQuery = {
+  type: "information_schema_schemata";
+};
+
+export type PgDatabaseQuery = {
+  type: "pg_database";
+};
+
+export type Query =
+  | SelectQuery
+  | ShowTablesQuery
+  | InformationSchemaTablesQuery
+  | InformationSchemaSchemataQuery
+  | PgDatabaseQuery;
 
 export type Prepared = { name: string; sql: string };
 export type Portal = { name: string; stmtName: string };

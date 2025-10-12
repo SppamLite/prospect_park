@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1001,
+    "customer_id": 1,
+    "order_date": "2024-10-01T14:30:00Z",
+    "total_amount": 929.98,
+    "status": "shipped",
+    "shipping_address": "123 Main St, New York, NY 10001"
+  },
+  {
+    "id": 1002,
+    "customer_id": 2,
+    "order_date": "2024-10-03T09:15:00Z",
+    "total_amount": 79.99,
+    "status": "delivered",
+    "shipping_address": "456 Oak Ave, Los Angeles, CA 90001"
+  },
+  {
+    "id": 1003,
+    "customer_id": 4,
+    "order_date": "2024-10-05T16:45:00Z",
+    "total_amount": 349.99,
+    "status": "processing",
+    "shipping_address": "789 Pine Rd, Chicago, IL 60601"
+  },
+  {
+    "id": 1004,
+    "customer_id": 1,
+    "order_date": "2024-10-08T11:20:00Z",
+    "total_amount": 45.98,
+    "status": "pending",
+    "shipping_address": "123 Main St, New York, NY 10001"
+  },
+  {
+    "id": 1005,
+    "customer_id": 2,
+    "order_date": "2024-10-10T13:00:00Z",
+    "total_amount": 899.99,
+    "status": "processing",
+    "shipping_address": "456 Oak Ave, Los Angeles, CA 90001"
+  }
+]

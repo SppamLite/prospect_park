@@ -62,6 +62,10 @@ export async function handleSimpleQuery(
   const parsed = parseQuery(sql);
 
   if (!parsed) {
+    logger.warn(
+      { database: state.dbName, sql: sql.substring(0, 200) },
+      "Query failed to parse",
+    );
     sock.write(
       concat([
         ErrorResponse(`Unsupported or malformed query: ${sql}`),
@@ -72,7 +76,7 @@ export async function handleSimpleQuery(
   }
 
   try {
-    const res = execQuery(parsed, db, state.dbName);
+    const res = await execQuery(parsed, db, state.dbName);
     sock.write(
       concat([
         RowDescription(res.cols),
@@ -83,6 +87,10 @@ export async function handleSimpleQuery(
     );
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "internal error";
+    logger.error(
+      { database: state.dbName, error: message, sql: sql.substring(0, 200) },
+      "Query execution error",
+    );
     sock.write(concat([ErrorResponse(message), ReadyForQuery("E")]));
   }
 }
@@ -202,14 +210,16 @@ export async function handleDescribe(
   // Build a RowDescription from current DB (best-effort)
   try {
     const db = await loadDB(state.dbName);
-    // For SHOW TABLES or information_schema, use the query as-is; for SELECT, set limit to 0
+    // For SHOW TABLES or information_schema queries, use the query as-is; for SELECT, set limit to 0
     const queryToDescribe =
       "type" in parsed &&
       (parsed.type === "show_tables" ||
-        parsed.type === "information_schema_tables")
+        parsed.type === "information_schema_tables" ||
+        parsed.type === "information_schema_schemata" ||
+        parsed.type === "pg_database")
         ? parsed
         : { ...parsed, limit: 0 };
-    const res = execQuery(queryToDescribe, db, state.dbName);
+    const res = await execQuery(queryToDescribe, db, state.dbName);
     sock.write(RowDescription(res.cols));
   } catch {
     sock.write(NoData());

@@ -4,10 +4,11 @@ import type {
   DB,
   Query,
   SelectQuery,
-  InformationSchemaQuery,
+  InformationSchemaTablesQuery,
 } from "../types/index.ts";
 import { OID } from "../types/index.ts";
 import { DataRow } from "../protocol/messages.ts";
+import { readdir, stat } from "node:fs/promises";
 
 function inferOID(v: unknown): { oid: number; size: number } {
   switch (typeof v) {
@@ -33,12 +34,58 @@ function toTextCell(v: unknown): string | null {
   return String(v);
 }
 
+export async function execPgDatabase(): Promise<{
+  cols: ColumnSpec[];
+  data: Bytes[];
+  tag: string;
+}> {
+  // List all databases by scanning ./data/ directory
+  const databases: string[] = [];
+
+  try {
+    const entries = await readdir("./data");
+    for (const entry of entries) {
+      const entryPath = `./data/${entry}`;
+      try {
+        const statInfo = await stat(entryPath);
+        if (statInfo.isDirectory()) {
+          databases.push(entry);
+        }
+      } catch {
+        // Skip entries that can't be statted
+      }
+    }
+  } catch {
+    // If data directory doesn't exist, return empty list
+  }
+
+  databases.sort();
+
+  // Standard pg_database columns (simplified)
+  const cols: ColumnSpec[] = [
+    { name: "datname", typeOID: OID.text, typeSize: -1, format: 0 },
+    { name: "datdba", typeOID: OID.int4, typeSize: 4, format: 0 },
+    { name: "encoding", typeOID: OID.int4, typeSize: 4, format: 0 },
+  ];
+
+  const data = databases.map(
+    (dbName) => DataRow([dbName, "10", "6"]), // datdba=10 (postgres), encoding=6 (UTF8)
+  );
+
+  return { cols, data, tag: `SELECT ${databases.length}` };
+}
+
 export function execShowTables(db: DB): {
   cols: ColumnSpec[];
   data: Bytes[];
   tag: string;
 } {
-  const tableNames = Object.keys(db).sort();
+  // Collect all table names from all schemas
+  const allTables: string[] = [];
+  for (const schema of Object.values(db)) {
+    allTables.push(...Object.keys(schema));
+  }
+  const tableNames = [...new Set(allTables)].sort();
 
   const cols: ColumnSpec[] = [
     { name: "Tables", typeOID: OID.text, typeSize: -1, format: 0 },
@@ -49,17 +96,51 @@ export function execShowTables(db: DB): {
   return { cols, data, tag: `SELECT ${tableNames.length}` };
 }
 
-export function execInformationSchemaTables(
-  q: InformationSchemaQuery,
+export function execInformationSchemaSchemata(
   db: DB,
   dbName: string,
 ): { cols: ColumnSpec[]; data: Bytes[]; tag: string } {
-  const tableNames = Object.keys(db).sort();
-  const schemaName = "public"; // Default schema name for now
+  // Get all schema names
+  const schemaNames = Object.keys(db).sort();
 
-  // Filter by schema if specified
-  const filteredTables =
-    q.schemaFilter && q.schemaFilter !== schemaName ? [] : tableNames;
+  // Standard information_schema.schemata columns
+  const cols: ColumnSpec[] = [
+    { name: "catalog_name", typeOID: OID.text, typeSize: -1, format: 0 },
+    { name: "schema_name", typeOID: OID.text, typeSize: -1, format: 0 },
+    { name: "schema_owner", typeOID: OID.text, typeSize: -1, format: 0 },
+  ];
+
+  const data = schemaNames.map((schemaName) =>
+    DataRow([dbName, schemaName, "postgres"]),
+  );
+
+  return { cols, data, tag: `SELECT ${schemaNames.length}` };
+}
+
+export function execInformationSchemaTables(
+  q: InformationSchemaTablesQuery,
+  db: DB,
+  dbName: string,
+): { cols: ColumnSpec[]; data: Bytes[]; tag: string } {
+  // Collect all tables from all schemas
+  const allTables: Array<{ schema: string; table: string }> = [];
+
+  for (const [schemaName, schema] of Object.entries(db)) {
+    // Filter by schema if specified
+    if (q.schemaFilter && schemaName !== q.schemaFilter) {
+      continue;
+    }
+
+    for (const tableName of Object.keys(schema)) {
+      allTables.push({ schema: schemaName, table: tableName });
+    }
+  }
+
+  // Sort by schema then table name
+  allTables.sort((a, b) => {
+    if (a.schema !== b.schema) return a.schema.localeCompare(b.schema);
+    return a.table.localeCompare(b.table);
+  });
 
   // Standard information_schema.tables columns
   const cols: ColumnSpec[] = [
@@ -69,19 +150,24 @@ export function execInformationSchemaTables(
     { name: "table_type", typeOID: OID.text, typeSize: -1, format: 0 },
   ];
 
-  const data = filteredTables.map((tableName) =>
-    DataRow([dbName, schemaName, tableName, "BASE TABLE"]),
+  const data = allTables.map(({ schema, table }) =>
+    DataRow([dbName, schema, table, "BASE TABLE"]),
   );
 
-  return { cols, data, tag: `SELECT ${filteredTables.length}` };
+  return { cols, data, tag: `SELECT ${allTables.length}` };
 }
 
 export function execSelect(
   q: SelectQuery,
   db: DB,
 ): { cols: ColumnSpec[]; data: Bytes[]; tag: string } {
-  const table = db[q.table];
-  if (!table) throw new Error(`relation "${q.table}" does not exist`);
+  const schemaName = q.schema ?? "public";
+  const schema = db[schemaName];
+  if (!schema) throw new Error(`schema "${schemaName}" does not exist`);
+
+  const table = schema[q.table];
+  if (!table)
+    throw new Error(`relation "${schemaName}.${q.table}" does not exist`);
 
   let rows = table;
   if (q.where) {
@@ -132,11 +218,11 @@ export function execSelect(
   return { cols: colsSpec, data, tag: `SELECT ${rows.length}` };
 }
 
-export function execQuery(
+export async function execQuery(
   query: Query,
   db: DB,
   dbName: string,
-): { cols: ColumnSpec[]; data: Bytes[]; tag: string } {
+): Promise<{ cols: ColumnSpec[]; data: Bytes[]; tag: string }> {
   if ("type" in query) {
     if (query.type === "show_tables") {
       return execShowTables(db);
@@ -144,7 +230,13 @@ export function execQuery(
     if (query.type === "information_schema_tables") {
       return execInformationSchemaTables(query, db, dbName);
     }
+    if (query.type === "information_schema_schemata") {
+      return execInformationSchemaSchemata(db, dbName);
+    }
+    if (query.type === "pg_database") {
+      return await execPgDatabase();
+    }
   }
-  // Type narrowing: if it's not a ShowTablesQuery or InformationSchemaQuery, it must be a SelectQuery
+  // Type narrowing: if it's not a special query type, it must be a SelectQuery
   return execSelect(query as SelectQuery, db);
 }

@@ -2,7 +2,9 @@ import type {
   Query,
   SelectQuery,
   ShowTablesQuery,
-  InformationSchemaQuery,
+  InformationSchemaTablesQuery,
+  InformationSchemaSchemataQuery,
+  PgDatabaseQuery,
 } from "../types/index.ts";
 
 function parseLiteral(lit: string): string | number | boolean | null {
@@ -24,6 +26,33 @@ export function parseQuery(sqlRaw: string): Query | null {
     return query;
   }
 
+  // Check for pg_database queries (for database list)
+  if (
+    /^select\s+.*\s+from\s+pg_catalog\.pg_database/i.test(sql) ||
+    /^select\s+.*\s+from\s+pg_database/i.test(sql)
+  ) {
+    const query: PgDatabaseQuery = {
+      type: "pg_database",
+    };
+    return query;
+  }
+
+  // Check for information_schema.schemata queries (for schema list)
+  if (/^select\s+.*\s+from\s+information_schema\.schemata/i.test(sql)) {
+    const query: InformationSchemaSchemataQuery = {
+      type: "information_schema_schemata",
+    };
+    return query;
+  }
+
+  // Check for pg_catalog.pg_namespace queries (alternative for schema list)
+  if (/^select\s+.*\s+from\s+pg_catalog\.pg_namespace/i.test(sql)) {
+    const query: InformationSchemaSchemataQuery = {
+      type: "information_schema_schemata",
+    };
+    return query;
+  }
+
   // Check for information_schema.tables queries (common in GUI clients)
   // Match: SELECT ... FROM information_schema.tables [WHERE table_schema = 'schema']
   const infoSchemaRe =
@@ -31,7 +60,7 @@ export function parseQuery(sqlRaw: string): Query | null {
   let m = sql.match(infoSchemaRe);
   if (m) {
     const schemaFilter = m[1];
-    const query: InformationSchemaQuery = {
+    const query: InformationSchemaTablesQuery = {
       type: "information_schema_tables",
       schemaFilter,
     };
@@ -44,35 +73,46 @@ export function parseQuery(sqlRaw: string): Query | null {
   m = sql.match(pgTablesRe);
   if (m) {
     const schemaFilter = m[1];
-    const query: InformationSchemaQuery = {
+    const query: InformationSchemaTablesQuery = {
       type: "information_schema_tables",
       schemaFilter,
     };
     return query;
   }
 
-  // Helper to extract table name from qualified name (removes schema prefix and quotes)
-  const extractTableName = (qualifiedName: string): string => {
-    // Remove quotes and extract table name from "schema"."table" or schema.table
+  // Helper to extract schema and table name from qualified name
+  const parseQualifiedName = (
+    qualifiedName: string,
+  ): { schema: string; table: string } => {
+    // Remove quotes and extract schema.table from "schema"."table" or schema.table
     const parts = qualifiedName.split(".");
-    const tableName = parts[parts.length - 1]!;
-    return tableName.replace(/^"(.+)"$/, "$1");
+
+    if (parts.length === 1) {
+      // Just table name, use default schema
+      const table = parts[0]!.replace(/^"(.+)"$/, "$1");
+      return { schema: "public", table };
+    }
+
+    // schema.table
+    const schema = parts[0]!.replace(/^"(.+)"$/, "$1");
+    const table = parts[1]!.replace(/^"(.+)"$/, "$1");
+    return { schema, table };
   };
 
   // Check for COUNT(*) query
   // Supports: schema.table or "schema"."table"
   const countRe =
-    /^select\s+count\(\s*\*\s*\)\s+from\s+(?:"?[a-zA-Z_][a-zA-Z0-9_]*"?\.)?("?[a-zA-Z_][a-zA-Z0-9_]*"?)\s*(?:where\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([^ ]+))?\s*(?:limit\s+(\d+))?\s*(?:offset\s+(\d+))?$/i;
+    /^select\s+count\(\s*\*\s*\)\s+from\s+((?:"?[a-zA-Z_][a-zA-Z0-9_]*"?\.)?(?:"?[a-zA-Z_][a-zA-Z0-9_]*"?))\s*(?:where\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([^ ]+))?\s*(?:limit\s+(\d+))?\s*(?:offset\s+(\d+))?$/i;
   m = sql.match(countRe);
   if (m) {
-    const tableRaw = m[1];
+    const qualifiedName = m[1];
     const wcol = m[2];
     const wval = m[3];
     const lim = m[4];
     const off = m[5];
-    if (!tableRaw) return null;
-    const table = extractTableName(tableRaw);
-    const q: SelectQuery = { columns: "*", table, isCountStar: true };
+    if (!qualifiedName) return null;
+    const { schema, table } = parseQualifiedName(qualifiedName);
+    const q: SelectQuery = { columns: "*", schema, table, isCountStar: true };
     if (wcol && wval)
       q.where = { col: wcol, op: "=", value: parseLiteral(wval) };
     if (lim) q.limit = Number(lim);
@@ -83,23 +123,23 @@ export function parseQuery(sqlRaw: string): Query | null {
   // Regular SELECT query
   // Supports: schema.table or "schema"."table", LIMIT, and OFFSET
   const re =
-    /^select\s+(.+?)\s+from\s+(?:"?[a-zA-Z_][a-zA-Z0-9_]*"?\.)?("?[a-zA-Z_][a-zA-Z0-9_]*"?)\s*(?:where\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([^ ]+))?\s*(?:limit\s+(\d+))?\s*(?:offset\s+(\d+))?$/i;
+    /^select\s+(.+?)\s+from\s+((?:"?[a-zA-Z_][a-zA-Z0-9_]*"?\.)?(?:"?[a-zA-Z_][a-zA-Z0-9_]*"?))\s*(?:where\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([^ ]+))?\s*(?:limit\s+(\d+))?\s*(?:offset\s+(\d+))?$/i;
   m = sql.match(re);
   if (!m) return null;
 
   const cols = m[1];
-  const tableRaw = m[2];
+  const qualifiedName = m[2];
   const wcol2 = m[3];
   const wval2 = m[4];
   const lim2 = m[5];
   const off2 = m[6];
 
-  if (!cols || !tableRaw) return null;
+  if (!cols || !qualifiedName) return null;
 
-  const table = extractTableName(tableRaw);
+  const { schema, table } = parseQualifiedName(qualifiedName);
   const columns =
     cols.trim() === "*" ? "*" : cols.split(",").map((s) => s.trim());
-  const q: SelectQuery = { columns, table };
+  const q: SelectQuery = { columns, schema, table };
   if (wcol2 && wval2)
     q.where = { col: wcol2, op: "=", value: parseLiteral(wval2) };
   if (lim2) q.limit = Number(lim2);

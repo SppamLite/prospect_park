@@ -1,0 +1,52 @@
+[
+  {
+    "id": 101,
+    "sku": "LAPTOP-HP-001",
+    "name": "HP Laptop 15",
+    "category": "Electronics",
+    "price": 899.99,
+    "stock_quantity": 25,
+    "supplier_id": 1,
+    "last_restocked": "2024-09-15T08:00:00Z"
+  },
+  {
+    "id": 102,
+    "sku": "MOUSE-LOG-002",
+    "name": "Logitech Wireless Mouse",
+    "category": "Accessories",
+    "price": 29.99,
+    "stock_quantity": 150,
+    "supplier_id": 2,
+    "last_restocked": "2024-10-01T12:30:00Z"
+  },
+  {
+    "id": 103,
+    "sku": "KEYB-MEK-003",
+    "name": "Mechanical Keyboard RGB",
+    "category": "Accessories",
+    "price": 79.99,
+    "stock_quantity": 45,
+    "supplier_id": 2,
+    "last_restocked": "2024-09-28T14:15:00Z"
+  },
+  {
+    "id": 104,
+    "sku": "MON-DELL-004",
+    "name": "Dell 27\" Monitor",
+    "category": "Electronics",
+    "price": 349.99,
+    "stock_quantity": 18,
+    "supplier_id": 1,
+    "last_restocked": "2024-09-20T10:45:00Z"
+  },
+  {
+    "id": 105,
+    "sku": "USB-SANDISK-005",
+    "name": "SanDisk 64GB USB Drive",
+    "category": "Storage",
+    "price": 15.99,
+    "stock_quantity": 200,
+    "supplier_id": 3,
+    "last_restocked": "2024-10-05T09:00:00Z"
+  }
+]

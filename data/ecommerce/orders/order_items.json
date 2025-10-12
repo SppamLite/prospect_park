@@ -1,0 +1,58 @@
+[
+  {
+    "id": 1,
+    "order_id": 1001,
+    "product_id": 101,
+    "quantity": 1,
+    "unit_price": 899.99,
+    "subtotal": 899.99
+  },
+  {
+    "id": 2,
+    "order_id": 1001,
+    "product_id": 102,
+    "quantity": 1,
+    "unit_price": 29.99,
+    "subtotal": 29.99
+  },
+  {
+    "id": 3,
+    "order_id": 1002,
+    "product_id": 103,
+    "quantity": 1,
+    "unit_price": 79.99,
+    "subtotal": 79.99
+  },
+  {
+    "id": 4,
+    "order_id": 1003,
+    "product_id": 104,
+    "quantity": 1,
+    "unit_price": 349.99,
+    "subtotal": 349.99
+  },
+  {
+    "id": 5,
+    "order_id": 1004,
+    "product_id": 102,
+    "quantity": 1,
+    "unit_price": 29.99,
+    "subtotal": 29.99
+  },
+  {
+    "id": 6,
+    "order_id": 1004,
+    "product_id": 105,
+    "quantity": 1,
+    "unit_price": 15.99,
+    "subtotal": 15.99
+  },
+  {
+    "id": 7,
+    "order_id": 1005,
+    "product_id": 101,
+    "quantity": 1,
+    "unit_price": 899.99,
+    "subtotal": 899.99
+  }
+]

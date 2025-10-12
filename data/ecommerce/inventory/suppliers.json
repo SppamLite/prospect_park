@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "name": "TechWorld Distribution",
+    "contact_email": "orders@techworld.com",
+    "phone": "+1-800-555-1000",
+    "country": "USA",
+    "rating": 4.5
+  },
+  {
+    "id": 2,
+    "name": "Gadget Suppliers Inc",
+    "contact_email": "sales@gadgetsuppliers.com",
+    "phone": "+1-800-555-2000",
+    "country": "USA",
+    "rating": 4.8
+  },
+  {
+    "id": 3,
+    "name": "Global Electronics Co",
+    "contact_email": "info@globalelec.com",
+    "phone": "+44-20-5555-3000",
+    "country": "UK",
+    "rating": 4.2
+  }
+]
