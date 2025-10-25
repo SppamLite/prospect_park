@@ -15,6 +15,8 @@ A lightweight PostgreSQL wire-protocol compatible database server that reads JSO
 - **Required Authentication**: Simple user/password auth via environment variables
 - **Structured Logging**: Pino logger with pretty output in development
 - **GUI Client Ready**: Full support for TablePlus, pgAdmin, DBeaver with schema/table discovery
+- **Graceful Shutdown**: Proper SIGTERM/SIGINT handling for Docker/Kubernetes deployments
+- **Query Delay**: Configurable artificial delays for testing slow database scenarios
 
 ## Quick Start with Docker
 
@@ -113,19 +115,39 @@ postgresql://anyuser:anypass@localhost:5432/bookstore
 
 ## Environment Variables
 
-| Variable            | Description                          | Default  |
-| ------------------- | ------------------------------------ | -------- |
-| `PORT`              | Server port                          | 5432     |
-| `POSTGRES_DB`       | Default database name                | postgres |
-| `POSTGRES_USER`     | Username                             | postgres |
-| `POSTGRES_PASSWORD` | Password                             | postgres |
-| `HOST`              | Bind address                         | 0.0.0.0  |
-| `LOG_LEVEL`         | Log level (debug, info, warn, error) | info     |
+| Variable            | Description                              | Default  |
+| ------------------- | ---------------------------------------- | -------- |
+| `PORT`              | Server port                              | 5432     |
+| `POSTGRES_DB`       | Default database name                    | postgres |
+| `POSTGRES_USER`     | Username                                 | postgres |
+| `POSTGRES_PASSWORD` | Password                                 | postgres |
+| `HOST`              | Bind address                             | 0.0.0.0  |
+| `LOG_LEVEL`         | Log level (debug, info, warn, error)     | info     |
+| `QUERY_DELAY`       | Delay in seconds for data queries        | disabled |
 
 **Authentication:**
 
 - Defaults to `postgres`/`postgres` (same as PostgreSQL)
 - Override with environment variables for custom credentials
+
+**Query Delay (Testing Feature):**
+
+Simulate slow database performance by adding artificial delays to data queries:
+
+```bash
+# 30 second delay for SELECT queries
+QUERY_DELAY=30 POSTGRES_DB=bookstore bun index.ts
+
+# Docker Compose example
+environment:
+  QUERY_DELAY: 30
+  POSTGRES_DB: bookstore
+```
+
+- Only affects data queries (`SELECT`, `COUNT`)
+- Metadata queries remain instant (schemas, tables, version)
+- Perfect for testing timeouts and loading states
+- GUI clients (TablePlus, pgAdmin) work normally
 
 ## Supported SQL
 
@@ -157,6 +179,8 @@ postgresql://anyuser:anypass@localhost:5432/bookstore
 - **Prototyping**: Test backend frameworks without setting up PostgreSQL
 - **Development**: Local development with JSON files as version-controlled data
 - **Testing**: Lightweight database for integration tests
+- **Performance Testing**: Simulate slow database queries with configurable delays
+- **Timeout Testing**: Test application behavior with slow database responses
 - **Education**: Learn PostgreSQL wire protocol implementation
 
 ## Limitations

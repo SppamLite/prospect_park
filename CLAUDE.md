@@ -84,6 +84,9 @@ bun run dev
 
 # Custom port and database
 PORT=5432 POSTGRES_DB=bookstore bun index.ts
+
+# Enable query delay for testing (simulates slow queries)
+QUERY_DELAY=30 POSTGRES_DB=bookstore bun index.ts
 ```
 
 #### Docker
@@ -108,11 +111,40 @@ docker-compose down
 - `POSTGRES_USER` - Username (default: postgres)
 - `POSTGRES_PASSWORD` - Password (default: postgres)
 - `LOG_LEVEL` - Log level: debug, info, warn, error (default: info)
+- `QUERY_DELAY` - Artificial delay in seconds for data queries (default: disabled)
 
 **Authentication:**
 
 - Defaults to `postgres`/`postgres` (same as PostgreSQL)
 - Override via environment variables or `.env` file
+
+**Query Delay (for Testing):**
+
+The `QUERY_DELAY` environment variable adds an artificial delay to data queries, useful for testing application behavior with slow database responses. The delay is specified in seconds.
+
+- **Smart Detection**: Only delays actual data queries (`SELECT`, `COUNT`)
+- **Metadata Queries Unaffected**: Schema, table listing, and version queries remain fast
+- **GUI Client Compatible**: TablePlus, pgAdmin, and other tools work normally (metadata queries are instant)
+- **Testing Use Case**: Simulate slow database performance without modifying application code
+
+Example usage:
+```sh
+# 30 second delay for all SELECT queries
+QUERY_DELAY=30 POSTGRES_DB=bookstore bun index.ts
+
+# In Docker Compose
+environment:
+  QUERY_DELAY: 30
+  POSTGRES_DB: bookstore
+```
+
+When enabled, you'll see log messages like:
+```
+[INFO]: Applying query delay
+  delay: 30
+  table: "books"
+  database: "bookstore"
+```
 
 ### Connecting to the Database
 
@@ -177,6 +209,11 @@ services:
 - **Required Authentication**: Simple user/password auth via environment variables (required)
 - **Structured Logging**: Pino logger with pretty-print in development
 - **Limited SQL**: Prepared statements don't support parameters
+- **Graceful Shutdown**: Handles SIGTERM/SIGINT signals properly
+  - Stops accepting new connections
+  - Waits for active connections to close (1 second grace period)
+  - Logs shutdown progress and active connection count
+  - Docker/Kubernetes friendly
 - **GUI Client Support**: Compatible with TablePlus, pgAdmin, and other PostgreSQL GUI clients
   - Database switching works seamlessly
   - Schema dropdown displays all schemas
@@ -199,6 +236,7 @@ Default to using Bun instead of Node.js.
 
 - **`Bun.listen()`** - Raw TCP sockets for PostgreSQL wire protocol
 - **`Bun.file()`** - Reading JSON table files
+- **`Bun.sleep()`** - Asynchronous delays for query simulation
 - **`Glob`** - Finding JSON files in database directories (from `bun` package)
 
 ### Bun APIs Not Used

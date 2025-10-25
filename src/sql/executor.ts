@@ -9,6 +9,41 @@ import type {
 import { OID } from "../types/index.ts";
 import { DataRow } from "../protocol/messages.ts";
 import { readdir, stat } from "node:fs/promises";
+import { logger } from "../utils/logger.ts";
+
+// Parse QUERY_DELAY environment variable (e.g., "30" for 30 seconds)
+const QUERY_DELAY_SECONDS = process.env.QUERY_DELAY
+  ? parseInt(process.env.QUERY_DELAY, 10)
+  : 0;
+
+/**
+ * Determines if a query should be delayed based on its type.
+ * Metadata queries (schemas, tables, version, etc.) are never delayed.
+ * Only user data queries (SELECT, COUNT) are delayed.
+ */
+function shouldDelayQuery(query: Query): boolean {
+  if (QUERY_DELAY_SECONDS <= 0) {
+    return false;
+  }
+
+  // Never delay metadata queries - these are used by GUI clients
+  if ("type" in query) {
+    const metadataTypes = [
+      "version",
+      "pg_type",
+      "pg_class",
+      "show_tables",
+      "information_schema_tables",
+      "information_schema_schemata",
+      "pg_namespace",
+      "pg_database",
+    ];
+    return !metadataTypes.includes(query.type);
+  }
+
+  // Delay SELECT and COUNT queries (user data queries)
+  return true;
+}
 
 function inferOID(v: unknown): { oid: number; size: number } {
   switch (typeof v) {
@@ -315,6 +350,17 @@ export async function execQuery(
   db: DB,
   dbName: string,
 ): Promise<{ cols: ColumnSpec[]; data: Bytes[]; tag: string }> {
+  // Apply delay for user data queries (not metadata queries)
+  if (shouldDelayQuery(query)) {
+    const tableName =
+      "table" in query ? query.table : "unknown";
+    logger.info(
+      { delay: QUERY_DELAY_SECONDS, table: tableName, database: dbName },
+      "Applying query delay",
+    );
+    await Bun.sleep(QUERY_DELAY_SECONDS * 1000);
+  }
+
   if ("type" in query) {
     if (query.type === "version") {
       return execVersion();

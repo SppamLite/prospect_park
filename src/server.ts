@@ -194,12 +194,17 @@ const server = Bun.listen<unknown>({
   },
 });
 
+const QUERY_DELAY = process.env.QUERY_DELAY
+  ? `${process.env.QUERY_DELAY}s`
+  : "disabled";
+
 logger.info(
   {
     host: HOST,
     port: PORT,
     defaultDb: DEFAULT_DB,
     authEnabled: true,
+    queryDelay: QUERY_DELAY,
   },
   "Prospect Park server started",
 );
