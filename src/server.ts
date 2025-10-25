@@ -32,11 +32,35 @@ const DEFAULT_DB = process.env.POSTGRES_DB ?? "postgres";
 const AUTH_USER = process.env.POSTGRES_USER ?? "postgres";
 const AUTH_PASSWORD = process.env.POSTGRES_PASSWORD ?? "postgres";
 
-Bun.listen<unknown>({
+// Graceful shutdown state
+let isShuttingDown = false;
+const activeConnections = new Set<PgSocket>();
+
+// Start the server
+const server = Bun.listen<unknown>({
   hostname: HOST,
   port: PORT,
   socket: {
     open(_sock) {
+      const pgSock = _sock as unknown as PgSocket;
+
+      // Reject new connections during shutdown
+      if (isShuttingDown) {
+        logger.info(
+          { remoteAddress: pgSock.remoteAddress },
+          "Rejected connection during shutdown",
+        );
+        try {
+          pgSock.end();
+        } catch {
+          // Ignore close errors
+        }
+        return;
+      }
+
+      // Track active connection
+      activeConnections.add(pgSock);
+
       // Connection opened, wait for startup message
     },
 
@@ -159,7 +183,9 @@ Bun.listen<unknown>({
     },
 
     close(_sock) {
-      // Connection closed
+      const pgSock = _sock as unknown as PgSocket;
+      // Remove from active connections
+      activeConnections.delete(pgSock);
     },
 
     error(_sock, err) {
@@ -177,3 +203,50 @@ logger.info(
   },
   "Prospect Park server started",
 );
+
+// Graceful shutdown handler
+function gracefulShutdown(signal: string): void {
+  if (isShuttingDown) {
+    return;
+  }
+  isShuttingDown = true;
+
+  logger.info(
+    {
+      signal,
+      activeConnections: activeConnections.size,
+    },
+    "Graceful shutdown initiated",
+  );
+
+  // Stop accepting new connections
+  server.stop();
+
+  // Close all active connections gracefully
+  for (const sock of activeConnections) {
+    try {
+      // Send a graceful termination by closing the socket
+      // Clients will receive a clean connection close
+      sock.end();
+    } catch {
+      // Ignore errors when closing (socket may already be closed)
+    }
+  }
+
+  // Wait briefly for connections to finish closing, then exit
+  setTimeout(() => {
+    const remaining = activeConnections.size;
+    if (remaining > 0) {
+      logger.warn(
+        { remainingConnections: remaining },
+        "Forcing shutdown with active connections",
+      );
+    }
+    logger.info("Shutdown complete");
+    process.exit(0);
+  }, 1000);
+}
+
+// Register signal handlers for graceful shutdown
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
