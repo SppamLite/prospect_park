@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "event_type": "page_view",
+    "user_id": 101,
+    "timestamp": "2024-10-25T10:30:00Z",
+    "page": "/home"
+  },
+  {
+    "id": 2,
+    "event_type": "click",
+    "user_id": 102,
+    "timestamp": "2024-10-25T10:31:00Z",
+    "page": "/products"
+  },
+  {
+    "id": 3,
+    "event_type": "purchase",
+    "user_id": 101,
+    "timestamp": "2024-10-25T10:32:00Z",
+    "page": "/checkout"
+  }
+]

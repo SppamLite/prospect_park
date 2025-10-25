@@ -42,6 +42,8 @@ docker run -p 5432:5432 \
 
 ## Docker Compose
 
+### Single Instance
+
 Create a `docker-compose.yml`:
 
 ```yaml
@@ -63,6 +65,23 @@ Then run:
 ```bash
 docker-compose up
 ```
+
+### Multiple Instances (Local Testing)
+
+Run 2-3 instances simultaneously with different configurations:
+
+```bash
+# See docker-compose.multi.yml for configuration
+docker-compose -f docker-compose.multi.yml up
+```
+
+This starts:
+
+- **db1** (port 5432): bookstore database, normal speed
+- **db2** (port 5433): ecommerce database, 10s query delay
+- **db3** (port 5434): analytics database, debug logging
+
+See [docker-compose.multi.md](docker-compose.multi.md) for detailed instructions.
 
 ## Data Format
 
@@ -96,6 +115,7 @@ Each JSON file must contain an **array of objects**:
 ```
 
 **Schema Support:**
+
 - Each subdirectory under `data/<database>/` is a schema
 - Use `public` schema for default tables
 - Query with schema: `SELECT * FROM sales.records`
@@ -115,15 +135,15 @@ postgresql://anyuser:anypass@localhost:5432/bookstore
 
 ## Environment Variables
 
-| Variable            | Description                              | Default  |
-| ------------------- | ---------------------------------------- | -------- |
-| `PORT`              | Server port                              | 5432     |
-| `POSTGRES_DB`       | Default database name                    | postgres |
-| `POSTGRES_USER`     | Username                                 | postgres |
-| `POSTGRES_PASSWORD` | Password                                 | postgres |
-| `HOST`              | Bind address                             | 0.0.0.0  |
-| `LOG_LEVEL`         | Log level (debug, info, warn, error)     | info     |
-| `QUERY_DELAY`       | Delay in seconds for data queries        | disabled |
+| Variable            | Description                          | Default  |
+| ------------------- | ------------------------------------ | -------- |
+| `PORT`              | Server port                          | 5432     |
+| `POSTGRES_DB`       | Default database name                | postgres |
+| `POSTGRES_USER`     | Username                             | postgres |
+| `POSTGRES_PASSWORD` | Password                             | postgres |
+| `HOST`              | Bind address                         | 0.0.0.0  |
+| `LOG_LEVEL`         | Log level (debug, info, warn, error) | info     |
+| `QUERY_DELAY`       | Delay in seconds for data queries    | disabled |
 
 **Authentication:**
 

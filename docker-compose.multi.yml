@@ -1,0 +1,86 @@
+# Multi-instance Docker Compose for local testing
+# Run with: docker-compose -f docker-compose.multi.yml up
+#
+# This configuration spins up 3 separate Prospect Park instances:
+# - db1: bookstore database on port 5432
+# - db2: ecommerce database on port 5433 with 10s query delay
+# - db3: analytics database on port 5434 with debug logging
+
+services:
+  # Instance 1: Bookstore database (normal speed)
+  db1:
+    build: .
+    container_name: prospect-park-bookstore
+    ports:
+      - "5432:5432" # Map host 5432 -> container 5432
+    environment:
+      POSTGRES_DB: bookstore
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      PORT: 5432
+      LOG_LEVEL: info
+      HOST: 0.0.0.0
+    volumes:
+      - ./data:/app/data # Share data directory
+    restart: unless-stopped
+    networks:
+      - prospect-park-network
+
+  # Instance 2: Ecommerce database (with 10s query delay)
+  db2:
+    build: .
+    container_name: prospect-park-ecommerce
+    ports:
+      - "5433:5432" # Map host 5433 -> container 5432
+    environment:
+      POSTGRES_DB: ecommerce
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      PORT: 5432 # Internal port stays 5432
+      LOG_LEVEL: info
+      QUERY_DELAY: 10 # 10 second delay for testing
+      HOST: 0.0.0.0
+    volumes:
+      - ./data:/app/data # Share data directory
+    restart: unless-stopped
+    networks:
+      - prospect-park-network
+
+  # Instance 3: Analytics database (debug mode)
+  db3:
+    build: .
+    container_name: prospect-park-analytics
+    ports:
+      - "5434:5432" # Map host 5434 -> container 5432
+    environment:
+      POSTGRES_DB: analytics
+      POSTGRES_USER: analyst
+      POSTGRES_PASSWORD: analyst456
+      PORT: 5432 # Internal port stays 5432
+      LOG_LEVEL: debug # Verbose logging
+      HOST: 0.0.0.0
+    volumes:
+      - ./data:/app/data # Share data directory
+    restart: unless-stopped
+    networks:
+      - prospect-park-network
+
+networks:
+  prospect-park-network:
+    driver: bridge
+# Connection strings for each instance:
+#
+# db1 (bookstore):
+#   postgresql://postgres:postgres@localhost:5432/bookstore
+#
+# db2 (ecommerce with delay):
+#   postgresql://admin:admin123@localhost:5433/ecommerce
+#
+# db3 (analytics with debug):
+#   postgresql://analyst:analyst456@localhost:5434/analytics
+#
+# Usage:
+#   docker-compose -f docker-compose.multi.yml up        # Start all
+#   docker-compose -f docker-compose.multi.yml up db1    # Start only db1
+#   docker-compose -f docker-compose.multi.yml down      # Stop all
+#   docker-compose -f docker-compose.multi.yml logs db2  # View db2 logs

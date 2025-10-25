@@ -66,6 +66,7 @@ Each JSON file must contain an **array of objects**:
 ```
 
 **Schema Support:**
+
 - Each subdirectory under `data/<database>/` is treated as a schema
 - The `public` schema is used by default if no schema is specified in queries
 - Query with schema: `SELECT * FROM sales.records` or `SELECT * FROM "sales"."records"`
@@ -128,6 +129,7 @@ The `QUERY_DELAY` environment variable adds an artificial delay to data queries,
 - **Testing Use Case**: Simulate slow database performance without modifying application code
 
 Example usage:
+
 ```sh
 # 30 second delay for all SELECT queries
 QUERY_DELAY=30 POSTGRES_DB=bookstore bun index.ts
@@ -139,6 +141,7 @@ environment:
 ```
 
 When enabled, you'll see log messages like:
+
 ```
 [INFO]: Applying query delay
   delay: 30

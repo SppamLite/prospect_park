@@ -1,0 +1,14 @@
+[
+  {
+    "month": "2024-09",
+    "total_sales": 15000.5,
+    "order_count": 250,
+    "avg_order_value": 60.0
+  },
+  {
+    "month": "2024-10",
+    "total_sales": 18500.75,
+    "order_count": 310,
+    "avg_order_value": 59.68
+  }
+]

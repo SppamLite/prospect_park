@@ -352,8 +352,7 @@ export async function execQuery(
 ): Promise<{ cols: ColumnSpec[]; data: Bytes[]; tag: string }> {
   // Apply delay for user data queries (not metadata queries)
   if (shouldDelayQuery(query)) {
-    const tableName =
-      "table" in query ? query.table : "unknown";
+    const tableName = "table" in query ? query.table : "unknown";
     logger.info(
       { delay: QUERY_DELAY_SECONDS, table: tableName, database: dbName },
       "Applying query delay",
