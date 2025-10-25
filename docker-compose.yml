@@ -1,6 +1,8 @@
 services:
   db:
-    build: .
+    image: sppamlitte/prospect-park:latest
+    # Uncomment to build locally instead of pulling from Docker Hub
+    # build: .
     ports:
       - "5432:5432"
     environment:
