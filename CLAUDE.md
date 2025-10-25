@@ -189,7 +189,7 @@ docker-compose exec db psql postgresql://localhost:5432/bookstore
 ```yaml
 services:
   db:
-    image: your-dockerhub-username/prospect-park
+    image: sppamlitte/prospect-park
     ports:
       - "5432:5432"
     environment:

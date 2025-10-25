@@ -1,5 +1,8 @@
 # Prospect Park - PostgreSQL-compatible JSON Database
 
+[![Docker Pulls](https://img.shields.io/docker/pulls/sppamlitte/prospect-park)](https://hub.docker.com/r/sppamlitte/prospect-park)
+[![Docker Image Size](https://img.shields.io/docker/image-size/sppamlitte/prospect-park)](https://hub.docker.com/r/sppamlitte/prospect-park)
+
 A lightweight PostgreSQL wire-protocol compatible database server that reads JSON files as database tables. Perfect for demos, prototyping, and development environments.
 
 ## Features
@@ -26,7 +29,7 @@ A lightweight PostgreSQL wire-protocol compatible database server that reads JSO
 docker run -p 5432:5432 \
   -e POSTGRES_DB=bookstore \
   -v $(pwd)/data:/app/data \
-  your-dockerhub-username/prospect-park
+  sppamlitte/prospect-park
 ```
 
 **Custom credentials:**
@@ -37,7 +40,7 @@ docker run -p 5432:5432 \
   -e POSTGRES_USER=myuser \
   -e POSTGRES_PASSWORD=mypassword \
   -v $(pwd)/data:/app/data \
-  your-dockerhub-username/prospect-park
+  sppamlitte/prospect-park
 ```
 
 ## Docker Compose
@@ -49,7 +52,7 @@ Create a `docker-compose.yml`:
 ```yaml
 services:
   db:
-    image: your-dockerhub-username/prospect-park
+    image: sppamlitte/prospect-park
     ports:
       - "5432:5432"
     environment:
@@ -81,7 +84,7 @@ This starts:
 - **db2** (port 5433): ecommerce database, 10s query delay
 - **db3** (port 5434): analytics database, debug logging
 
-See [docker-compose.multi.md](docker-compose.multi.md) for detailed instructions.
+See [docs/multi-instance-setup.md](docs/multi-instance-setup.md) for detailed instructions.
 
 ## Data Format
 
@@ -231,20 +234,23 @@ cp .env.example .env
 bun run dev
 ```
 
+## Documentation
+
+- **[Multi-Instance Setup](docs/multi-instance-setup.md)** - Run multiple database instances simultaneously
+- **[Docker Hub Publishing](docs/docker-hub-publishing.md)** - How to publish and update the Docker image
+- **[Project Structure](docs/project-structure.md)** - Architecture and module organization
+
 ## Publishing to Docker Hub
 
+The image is published at `sppamlitte/prospect-park` on Docker Hub.
+
+**Pull the image:**
+
 ```bash
-# Build the image
-docker build -t your-dockerhub-username/prospect-park .
-
-# Tag versions
-docker tag your-dockerhub-username/prospect-park:latest \
-  your-dockerhub-username/prospect-park:1.0.0
-
-# Push to Docker Hub
-docker push your-dockerhub-username/prospect-park:latest
-docker push your-dockerhub-username/prospect-park:1.0.0
+docker pull sppamlitte/prospect-park:latest
 ```
+
+**To publish updates**, see [docs/docker-hub-publishing.md](docs/docker-hub-publishing.md) for detailed instructions.
 
 ## License
 
